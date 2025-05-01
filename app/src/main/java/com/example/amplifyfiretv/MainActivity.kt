@@ -1,47 +1,48 @@
 package com.example.amplifyfiretv
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.tv.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Surface
-import com.example.amplifyfiretv.ui.theme.MyApplicationTheme
+import android.view.ViewGroup
+import android.widget.TextView
+import androidx.fragment.app.FragmentActivity
+import androidx.leanback.app.BrowseSupportFragment
+import androidx.leanback.widget.*
 
-class MainActivity : ComponentActivity() {
-    @OptIn(ExperimentalTvMaterial3Api::class)
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            MyApplicationTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    shape = RectangleShape
-                ) {
-                    Greeting("Android")
-                }
-            }
+        setContentView(R.layout.activity_main)
+
+        if (savedInstanceState == null) {
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.main_browse_fragment, MainFragment())
+                .commit()
         }
     }
 }
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+class MainFragment : BrowseSupportFragment() {
+    override fun onActivityCreated(savedInstanceState: Bundle?) {
+        super.onActivityCreated(savedInstanceState)
+        setupUIElements()
+        loadContent()
+    }
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    MyApplicationTheme {
-        Greeting("Android")
+    private fun setupUIElements() {
+        title = "Amplify Fire TV"
+        headersState = HEADERS_DISABLED
+    }
+
+    private fun loadContent() {
+        val textView = TextView(requireContext()).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            text = "Hello Android"
+            textSize = 24f
+        }
+
+        val container = requireActivity().findViewById<ViewGroup>(R.id.main_browse_fragment)
+        container.addView(textView)
     }
 }
