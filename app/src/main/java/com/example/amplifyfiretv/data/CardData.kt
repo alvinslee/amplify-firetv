@@ -1,29 +1,34 @@
 package com.example.amplifyfiretv.data
 
-import com.example.amplifyfiretv.R
+import android.content.Context
+import com.google.gson.Gson
 
 data class CardData(
+    val videoId: String,
     val title: String,
     val subtitle: String,
-    val imageUrl: String
+    val imageUrl: String,
+    val videoUrl: String
+)
+
+data class CardDataResponse(
+    val cards: List<CardData>
 )
 
 object CardDataProvider {
-    val cards = listOf(
-        CardData(
-            title = "Getting Started with Fire TV",
-            subtitle = "Development Basics",
-            imageUrl = "https://fastly.picsum.photos/id/767/300/200.jpg?hmac=TTc0t0lEJWrTHSWhos7VTReXgTKIk-OUc3fQA1w91sI"
-        ),
-        CardData(
-            title = "UI Components",
-            subtitle = "Building TV Interfaces",
-            imageUrl = "https://fastly.picsum.photos/id/448/300/200.jpg?hmac=WHgZcNfmMcA8Sl33YH3lirNV6pSOFPOrxigNhp-lNzc"
-        ),
-        CardData(
-            title = "Content Integration",
-            subtitle = "Media Playback",
-            imageUrl = "https://fastly.picsum.photos/id/890/300/200.jpg?hmac=0LKMOsjIqNRCSE4Iqm1C8jryvFHQKLxO2PLNzrhDCKw"
-        )
-    )
+    private var cards: List<CardData> = emptyList()
+
+    fun initialize(context: Context) {
+        try {
+            val jsonString = context.assets.open("cards.json").bufferedReader().use { it.readText() }
+            val response = Gson().fromJson(jsonString, CardDataResponse::class.java)
+            cards = response.cards
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // Fallback to empty list if there's an error
+            cards = emptyList()
+        }
+    }
+
+    fun getCards(): List<CardData> = cards
 } 

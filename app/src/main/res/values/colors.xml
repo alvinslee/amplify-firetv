@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="dark_orange">#CC6600</color>
-    <color name="dark_orange_dark">#994D00</color>
-    <color name="dark_orange_light">#FF8533</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <color name="background_gradient_start">#FF5722</color>
+    <color name="background_gradient_end">#E64A19</color>
+    <color name="dark_orange">#FF5722</color>
+    <color name="dark_orange_light">#FF5722</color>
+    <color name="dark_orange_dark">#E64A19</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
 </resources> 

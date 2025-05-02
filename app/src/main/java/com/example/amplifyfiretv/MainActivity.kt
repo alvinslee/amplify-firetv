@@ -1,11 +1,11 @@
 package com.example.amplifyfiretv
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.os.Bundle
-import android.util.Log
 import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.core.content.ContextCompat
@@ -25,11 +25,12 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d(TAG, "MainActivity onCreate")
         setContentView(R.layout.activity_main)
 
+        // Initialize card data
+        CardDataProvider.initialize(applicationContext)
+
         if (savedInstanceState == null) {
-            Log.d(TAG, "Adding MainFragment")
             supportFragmentManager.beginTransaction()
                 .replace(R.id.main_browse_fragment, MainFragment())
                 .commit()
@@ -44,23 +45,19 @@ class MainFragment : BrowseSupportFragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d(TAG, "MainFragment onCreate")
     }
 
     override fun onViewCreated(view: android.view.View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        Log.d(TAG, "MainFragment onViewCreated")
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
-        Log.d(TAG, "MainFragment onActivityCreated")
         setupUIElements()
         loadContent()
     }
 
     private fun setupUIElements() {
-        Log.d(TAG, "Setting up UI elements")
         title = "Amplify Fire TV"
         headersState = HEADERS_DISABLED
         isHeadersTransitionOnBackEnabled = true
@@ -79,25 +76,31 @@ class MainFragment : BrowseSupportFragment() {
     }
 
     private fun loadContent() {
-        Log.d(TAG, "Loading content")
         val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
         val cardPresenter = CardPresenter()
         val listRowAdapter = ArrayObjectAdapter(cardPresenter)
 
         // Add all cards to the adapter
-        CardDataProvider.cards.forEach { card ->
-            Log.d(TAG, "Adding card: ${card.title}")
+        CardDataProvider.getCards().forEach { card ->
             listRowAdapter.add(card)
         }
 
         // Create a header for our row
         val header = HeaderItem(0, "Featured Content")
         rowsAdapter.add(ListRow(header, listRowAdapter))
-        Log.d(TAG, "Added row with ${listRowAdapter.size()} cards")
 
         // Set the adapter
         adapter = rowsAdapter
-        Log.d(TAG, "Adapter set with ${rowsAdapter.size()} rows")
+
+        // Set up click listener
+        onItemViewClickedListener = OnItemViewClickedListener { itemViewHolder, item, rowViewHolder, row ->
+            if (item is CardData) {
+                val intent = Intent(requireContext(), VideoPlayerActivity::class.java).apply {
+                    putExtra(VideoPlayerActivity.EXTRA_VIDEO_URL, item.videoUrl)
+                }
+                startActivity(intent)
+            }
+        }
     }
 }
 
@@ -118,7 +121,6 @@ class CardPresenter : Presenter() {
     }
 
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
-        Log.d(TAG, "Creating card view holder")
         val cardView = CustomImageCardView(parent.context)
         cardView.isFocusable = true
         cardView.isFocusableInTouchMode = true
@@ -128,8 +130,6 @@ class CardPresenter : Presenter() {
     override fun onBindViewHolder(viewHolder: ViewHolder, item: Any) {
         val cardData = item as CardData
         val cardView = viewHolder.view as CustomImageCardView
-        
-        Log.d(TAG, "Binding card: ${cardData.title} with image URL: ${cardData.imageUrl}")
         
         cardView.titleText = cardData.title
         cardView.contentText = cardData.subtitle

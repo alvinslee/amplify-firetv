@@ -1,0 +1,81 @@
+{
+  "cards": [
+    {
+      "videoId": "big-buck-bunny",
+      "title": "Big Buck Bunny",
+      "subtitle": "By Blender Foundation",
+      "imageUrl": "https://fastly.picsum.photos/id/399/300/200.jpg?hmac=hvZw-Q-pjzN_Rf4InIQrq3f6AX_1jS6az0g0GdO5CyU",
+      "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+    },
+    {
+      "videoId": "elephant-dream",
+      "title": "Elephant Dream",
+      "subtitle": "By Blender Foundation",
+      "imageUrl": "https://fastly.picsum.photos/id/318/300/200.jpg?hmac=9s-HqE4Jk695t8is5UuwS-FEc5rNvbKOOQNaPAMkZeE",
+      "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
+    },
+    {
+      "videoId": "tears-of-steel",
+      "title": "Tears of Steel",
+      "subtitle": "By Blender Foundation",
+      "imageUrl": "https://fastly.picsum.photos/id/669/300/200.jpg?hmac=FszhCKDSLapO2E3ICtTCcMGY4-a-ItQvf199yjc5w4A",
+      "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"
+    },
+    {
+      "videoId": "sintel",
+      "title": "Sintel",
+      "subtitle": "By Blender Foundation",
+      "imageUrl": "https://fastly.picsum.photos/id/19/300/200.jpg?hmac=nBstyywZDrXH87VCNbwMI7EObhfbFjRbHCLMpCLMbl4",
+      "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"
+    },
+    {
+      "videoId": "subaru-outback",
+      "title": "Subaru Outback On Street And Dirt",
+      "subtitle": "By Garage419",
+      "imageUrl": "https://fastly.picsum.photos/id/64/300/200.jpg?hmac=bsd1bjq-Md2Sb-zhI1f_fc9xGY1jnw5_0T07F3eZqOo",
+      "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4"
+    },
+    {
+      "videoId": "volkswagen-gti",
+      "title": "Volkswagen GTI Review",
+      "subtitle": "By Garage419",
+      "imageUrl": "https://fastly.picsum.photos/id/1076/300/200.jpg?hmac=8ZAl6-qf4cElnrOOiAKOVgIu61bq9QFfu8aaUFBsb2g",
+      "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4"
+    },
+    {
+      "videoId": "bullrun",
+      "title": "We Are Going On Bullrun",
+      "subtitle": "By Garage419",
+      "imageUrl": "https://fastly.picsum.photos/id/649/300/200.jpg?hmac=n_KME5Y_6RUfJetnHXGwwU8N_soTiquYirxqQ_fESPQ",
+      "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4"
+    },
+    {
+      "videoId": "bigger-blazes",
+      "title": "For Bigger Blazes",
+      "subtitle": "By Google",
+      "imageUrl": "https://fastly.picsum.photos/id/551/300/200.jpg?hmac=lBODBmTUsmzU9CBx3hXBys1q11ziXlXGIxOtOGa2804",
+      "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+    },
+    {
+      "videoId": "bigger-fun",
+      "title": "For Bigger Fun",
+      "subtitle": "By Google",
+      "imageUrl": "https://fastly.picsum.photos/id/736/300/200.jpg?hmac=VMEBbfgnuOtJXS_RYVlSfGKd37uTDHtHcqWbvaXnBI8",
+      "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"
+    },
+    {
+      "videoId": "bigger-joyrides",
+      "title": "For Bigger Joyrides",
+      "subtitle": "By Google",
+      "imageUrl": "https://fastly.picsum.photos/id/406/300/200.jpg?hmac=1c_aM6Ukchjkcy07rcDj7KqyfKhbjwwqPp5PatbnJp4",
+      "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4"
+    },
+    {
+      "videoId": "bigger-meltdowns",
+      "title": "For Bigger Meltdowns",
+      "subtitle": "By Google",
+      "imageUrl": "https://fastly.picsum.photos/id/382/300/200.jpg?hmac=E0DQ7pBkYETJtSSD6t8zaOmQQhV5QPiAtNUYRlSxAAg",
+      "videoUrl": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4"
+    }
+  ]
+}
