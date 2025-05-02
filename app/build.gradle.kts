@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    id("kotlin-kapt")
 }
 
 android {
@@ -45,7 +46,12 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation("androidx.leanback:leanback:1.0.0")
     implementation("androidx.leanback:leanback-preference:1.0.0")
-    implementation("com.github.bumptech.glide:glide:4.12.0")
+    
+    // Glide
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    kapt("com.github.bumptech.glide:compiler:4.16.0")
+    implementation("com.github.bumptech.glide:okhttp3-integration:4.16.0")
+    
     implementation(libs.androidx.lifecycle.runtime.ktx)
     
     // Testing dependencies
