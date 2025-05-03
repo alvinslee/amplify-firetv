@@ -8,6 +8,8 @@ import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.TextView
+import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.leanback.app.BrowseSupportFragment
@@ -18,6 +20,23 @@ import com.example.amplifyfiretv.data.CardData
 import com.example.amplifyfiretv.data.CardDataProvider
 import android.view.View
 import android.util.Log
+import com.amplifyframework.auth.AuthException
+import com.amplifyframework.auth.AuthSession
+import com.amplifyframework.auth.cognito.AWSCognitoAuthSession
+import com.amplifyframework.auth.cognito.result.AWSCognitoAuthSignOutResult
+import com.amplifyframework.auth.cognito.result.AWSCognitoAuthSignOutResult.CompleteSignOut
+import com.amplifyframework.auth.cognito.result.AWSCognitoAuthSignOutResult.PartialSignOut
+import com.amplifyframework.auth.cognito.result.AWSCognitoAuthSignOutResult.FailedSignOut
+import com.amplifyframework.core.Amplify
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.amplifyframework.core.Consumer
+import android.os.Handler
+import android.os.Looper
+import android.text.TextUtils
+import com.amplifyframework.auth.AuthUserAttributeKey
 
 class MainActivity : FragmentActivity() {
     companion object {
@@ -39,10 +58,12 @@ class MainActivity : FragmentActivity() {
 class MainFragment : BrowseSupportFragment() {
     companion object {
         private const val TAG = "MainFragment"
+        private const val SIGN_IN_REQUEST = 1
     }
 
     private var rowsAdapter: ArrayObjectAdapter? = null
     private var listRowAdapter: ArrayObjectAdapter? = null
+    private var authRowAdapter: ArrayObjectAdapter? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,6 +80,7 @@ class MainFragment : BrowseSupportFragment() {
         Log.d(TAG, "MainFragment onActivityCreated")
         setupUIElements()
         setupContent()
+        checkAuthSession()
         
         // Set up card loading listener
         CardDataProvider.setOnCardsLoadedListener {
@@ -90,44 +112,218 @@ class MainFragment : BrowseSupportFragment() {
     private fun setupContent() {
         Log.d(TAG, "Setting up content structure")
         rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
+        
+        // Set up auth row
+        val authPresenter = AuthPresenter()
+        authRowAdapter = ArrayObjectAdapter(authPresenter)
+        rowsAdapter?.add(ListRow(null, authRowAdapter))
+        
+        // Set up content row
         val cardPresenter = CardPresenter()
         listRowAdapter = ArrayObjectAdapter(cardPresenter)
-
-        // Create a header for our row
-        val header = HeaderItem(0, "Featured Content")
-        rowsAdapter?.add(ListRow(header, listRowAdapter))
+        val contentHeader = HeaderItem(0, "Featured Content")
+        rowsAdapter?.add(ListRow(contentHeader, listRowAdapter))
 
         // Set the adapter
         adapter = rowsAdapter
 
         // Set up click listener
         onItemViewClickedListener = OnItemViewClickedListener { itemViewHolder, item, rowViewHolder, row ->
-            if (item is CardData) {
-                Log.d(TAG, "Card clicked: ${item.title}")
-                val intent = Intent(requireContext(), VideoPlayerActivity::class.java).apply {
-                    putExtra(VideoPlayerActivity.EXTRA_VIDEO_URL, item.videoUrl)
+            when (item) {
+                is CardData -> {
+                    Log.d(TAG, "Card clicked: ${item.title}")
+                    val intent = Intent(requireContext(), VideoPlayerActivity::class.java).apply {
+                        putExtra(VideoPlayerActivity.EXTRA_VIDEO_URL, item.videoUrl)
+                    }
+                    startActivity(intent)
                 }
-                startActivity(intent)
+                is AuthAction -> {
+                    when (item) {
+                        is AuthAction.SignIn -> {
+                            val intent = Intent(requireContext(), SignInActivity::class.java)
+                            startActivityForResult(intent, SIGN_IN_REQUEST)
+                        }
+                        is AuthAction.SignOut -> {
+                            Log.d(TAG, "Sign out clicked")
+                            Amplify.Auth.signOut { signOutResult ->
+                                when(signOutResult) {
+                                    is CompleteSignOut -> {
+                                        Log.i(TAG, "Signed out successfully")
+                                        Handler(Looper.getMainLooper()).post {
+                                            updateAuthUI(false)
+                                        }
+                                    }
+                                    is PartialSignOut -> {
+                                        Log.e(TAG, "Partial sign out occurred")
+                                        signOutResult.hostedUIError?.let {
+                                            Log.e(TAG, "HostedUI Error", it.exception)
+                                        }
+                                        signOutResult.globalSignOutError?.let {
+                                            Log.e(TAG, "GlobalSignOut Error", it.exception)
+                                        }
+                                        signOutResult.revokeTokenError?.let {
+                                            Log.e(TAG, "RevokeToken Error", it.exception)
+                                        }
+                                        Handler(Looper.getMainLooper()).post {
+                                            updateAuthUI(false)
+                                        }
+                                    }
+                                    is FailedSignOut -> {
+                                        Log.e(TAG, "Sign out Failed", signOutResult.exception)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 
     private fun updateContent() {
-        Log.d(TAG, "Updating content with loaded cards")
         listRowAdapter?.clear()
-        
-        // Add all cards to the adapter
         val cards = CardDataProvider.getCards()
-        Log.d(TAG, "Retrieved ${cards.size} cards from CardDataProvider")
         
         cards.forEach { card ->
-            Log.d(TAG, "Adding card to adapter: ${card.title}")
             listRowAdapter?.add(card)
         }
         
         // Notify the adapter that the data has changed
         listRowAdapter?.notifyArrayItemRangeChanged(0, cards.size)
-        Log.d(TAG, "Content update complete")
+    }
+
+    private fun checkAuthSession() {
+        Amplify.Auth.fetchAuthSession(
+            { session ->
+                val cognitoSession = session as AWSCognitoAuthSession
+                if (cognitoSession.isSignedIn) {
+                    handleSignedInState()
+                } else {
+                    Log.d(TAG, "User is not signed in")
+                    Handler(Looper.getMainLooper()).post {
+                        updateAuthUI(false)
+                    }
+                }
+            },
+            { error ->
+                Log.e(TAG, "Failed to fetch session", error)
+                Handler(Looper.getMainLooper()).post {
+                    updateAuthUI(false)
+                }
+            }
+        )
+    }
+
+    private fun handleSignedInState() {
+        Amplify.Auth.fetchUserAttributes(
+            { attributes ->
+                val email = attributes.find { it.key == AuthUserAttributeKey.email() }?.value
+                Log.d(TAG, "User is signed in with email: $email")
+                Handler(Looper.getMainLooper()).post {
+                    authRowAdapter?.clear()
+                    authRowAdapter?.add(AuthAction.SignOut(email ?: "", "Sign out"))
+                    authRowAdapter?.notifyArrayItemRangeChanged(0, 1)
+                }
+            },
+            { error ->
+                Log.e(TAG, "Failed to fetch user attributes", error)
+                Handler(Looper.getMainLooper()).post {
+                    authRowAdapter?.clear()
+                    authRowAdapter?.add(AuthAction.SignOut("", "Sign out"))
+                    authRowAdapter?.notifyArrayItemRangeChanged(0, 1)
+                }
+            }
+        )
+    }
+
+    private fun updateAuthUI(isSignedIn: Boolean) {
+        authRowAdapter?.clear()
+        if (isSignedIn) {
+            handleSignedInState()
+        } else {
+            authRowAdapter?.add(AuthAction.SignIn("Sign In"))
+            authRowAdapter?.notifyArrayItemRangeChanged(0, 1)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == SIGN_IN_REQUEST) {
+            checkAuthSession()
+        }
+    }
+}
+
+sealed class AuthAction {
+    data class SignIn(val text: String) : AuthAction()
+    data class SignOut(val email: String, val text: String) : AuthAction()
+}
+
+class AuthPresenter : Presenter() {
+    override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
+        val layout = LinearLayout(parent.context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(32, 16, 32, 16)
+        }
+
+        val emailText = TextView(parent.context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginEnd = 32
+                weight = 1f
+            }
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }
+
+        val signOutText = TextView(parent.context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            isFocusable = true
+            isFocusableInTouchMode = true
+        }
+
+        layout.addView(emailText)
+        layout.addView(signOutText)
+        return ViewHolder(layout)
+    }
+
+    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any) {
+        val layout = viewHolder.view as LinearLayout
+        val emailText = layout.getChildAt(0) as TextView
+        val signOutText = layout.getChildAt(1) as TextView
+
+        when (val authAction = item as AuthAction) {
+            is AuthAction.SignIn -> {
+                emailText.visibility = View.GONE
+                signOutText.text = authAction.text
+            }
+            is AuthAction.SignOut -> {
+                emailText.visibility = View.VISIBLE
+                emailText.text = authAction.email
+                signOutText.text = authAction.text
+            }
+        }
+    }
+
+    override fun onUnbindViewHolder(viewHolder: ViewHolder) {
+        val layout = viewHolder.view as LinearLayout
+        val emailText = layout.getChildAt(0) as TextView
+        val signOutText = layout.getChildAt(1) as TextView
+        emailText.text = ""
+        signOutText.text = ""
     }
 }
 
