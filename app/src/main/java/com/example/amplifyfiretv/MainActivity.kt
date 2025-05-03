@@ -17,6 +17,7 @@ import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.example.amplifyfiretv.data.CardData
 import com.example.amplifyfiretv.data.CardDataProvider
 import android.view.View
+import android.util.Log
 
 class MainActivity : FragmentActivity() {
     companion object {
@@ -40,21 +41,34 @@ class MainFragment : BrowseSupportFragment() {
         private const val TAG = "MainFragment"
     }
 
+    private var rowsAdapter: ArrayObjectAdapter? = null
+    private var listRowAdapter: ArrayObjectAdapter? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d(TAG, "MainFragment onCreate")
     }
 
     override fun onViewCreated(view: android.view.View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        Log.d(TAG, "MainFragment onViewCreated")
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
+        Log.d(TAG, "MainFragment onActivityCreated")
         setupUIElements()
-        loadContent()
+        setupContent()
+        
+        // Set up card loading listener
+        CardDataProvider.setOnCardsLoadedListener {
+            Log.d(TAG, "Cards loaded, updating UI")
+            updateContent()
+        }
     }
 
     private fun setupUIElements() {
+        Log.d(TAG, "Setting up UI elements")
         title = "Amplify Fire TV"
         headersState = HEADERS_DISABLED
         isHeadersTransitionOnBackEnabled = true
@@ -70,21 +84,18 @@ class MainFragment : BrowseSupportFragment() {
 
         // Enable the title by setting the headers state
         headersState = HEADERS_ENABLED
+        Log.d(TAG, "UI elements setup complete")
     }
 
-    private fun loadContent() {
-        val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
+    private fun setupContent() {
+        Log.d(TAG, "Setting up content structure")
+        rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
         val cardPresenter = CardPresenter()
-        val listRowAdapter = ArrayObjectAdapter(cardPresenter)
-
-        // Add all cards to the adapter
-        CardDataProvider.getCards().forEach { card ->
-            listRowAdapter.add(card)
-        }
+        listRowAdapter = ArrayObjectAdapter(cardPresenter)
 
         // Create a header for our row
         val header = HeaderItem(0, "Featured Content")
-        rowsAdapter.add(ListRow(header, listRowAdapter))
+        rowsAdapter?.add(ListRow(header, listRowAdapter))
 
         // Set the adapter
         adapter = rowsAdapter
@@ -92,12 +103,31 @@ class MainFragment : BrowseSupportFragment() {
         // Set up click listener
         onItemViewClickedListener = OnItemViewClickedListener { itemViewHolder, item, rowViewHolder, row ->
             if (item is CardData) {
+                Log.d(TAG, "Card clicked: ${item.title}")
                 val intent = Intent(requireContext(), VideoPlayerActivity::class.java).apply {
                     putExtra(VideoPlayerActivity.EXTRA_VIDEO_URL, item.videoUrl)
                 }
                 startActivity(intent)
             }
         }
+    }
+
+    private fun updateContent() {
+        Log.d(TAG, "Updating content with loaded cards")
+        listRowAdapter?.clear()
+        
+        // Add all cards to the adapter
+        val cards = CardDataProvider.getCards()
+        Log.d(TAG, "Retrieved ${cards.size} cards from CardDataProvider")
+        
+        cards.forEach { card ->
+            Log.d(TAG, "Adding card to adapter: ${card.title}")
+            listRowAdapter?.add(card)
+        }
+        
+        // Notify the adapter that the data has changed
+        listRowAdapter?.notifyArrayItemRangeChanged(0, cards.size)
+        Log.d(TAG, "Content update complete")
     }
 }
 
