@@ -6,7 +6,8 @@ import com.amplifyframework.core.Amplify
 import com.amplifyframework.core.configuration.AmplifyOutputs
 import com.amplifyframework.storage.s3.AWSS3StoragePlugin
 import com.amplifyframework.auth.cognito.AWSCognitoAuthPlugin
-import com.example.amplifyfiretv.data.CardDataProvider
+import com.amplifyframework.api.aws.AWSApiPlugin
+import com.example.amplifyfiretv.model.CardDataProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,6 +25,7 @@ class AmplifyApp : Application() {
         try {
             Amplify.addPlugin(AWSS3StoragePlugin())
             Amplify.addPlugin(AWSCognitoAuthPlugin())
+            Amplify.addPlugin(AWSApiPlugin())
             val outputs = AmplifyOutputs.fromResource(R.raw.amplify_outputs)
             Amplify.configure(outputs, applicationContext)
             

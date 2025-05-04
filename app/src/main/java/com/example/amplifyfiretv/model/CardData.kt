@@ -1,6 +1,8 @@
-package com.example.amplifyfiretv.data
+package com.example.amplifyfiretv.model
 
 import android.content.Context
+import android.os.Parcel
+import android.os.Parcelable
 import android.util.Log
 import com.amplifyframework.core.Amplify
 import com.amplifyframework.core.configuration.AmplifyOutputs
@@ -21,7 +23,33 @@ data class CardData(
     val subtitle: String,
     val imageUrl: String,
     val videoUrl: String
-)
+) : Parcelable {
+    override fun describeContents(): Int = 0
+
+    override fun writeToParcel(parcel: Parcel, flags: Int) {
+        parcel.writeString(videoId)
+        parcel.writeString(title)
+        parcel.writeString(subtitle)
+        parcel.writeString(imageUrl)
+        parcel.writeString(videoUrl)
+    }
+
+    companion object CREATOR : Parcelable.Creator<CardData> {
+        override fun createFromParcel(parcel: Parcel): CardData {
+            return CardData(
+                videoId = parcel.readString() ?: "",
+                title = parcel.readString() ?: "",
+                subtitle = parcel.readString() ?: "",
+                imageUrl = parcel.readString() ?: "",
+                videoUrl = parcel.readString() ?: ""
+            )
+        }
+
+        override fun newArray(size: Int): Array<CardData?> {
+            return arrayOfNulls(size)
+        }
+    }
+}
 
 data class CardDataResponse(
     val cards: List<CardData>

@@ -16,8 +16,8 @@ import androidx.leanback.app.BrowseSupportFragment
 import androidx.leanback.widget.*
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
-import com.example.amplifyfiretv.data.CardData
-import com.example.amplifyfiretv.data.CardDataProvider
+import com.example.amplifyfiretv.model.CardData
+import com.example.amplifyfiretv.model.CardDataProvider
 import android.view.View
 import android.util.Log
 import com.amplifyframework.auth.AuthException
@@ -37,6 +37,9 @@ import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
 import com.amplifyframework.auth.AuthUserAttributeKey
+import androidx.leanback.widget.ImageCardView.CARD_TYPE_INFO_UNDER
+import com.example.amplifyfiretv.presenter.VideoCardPresenter
+import androidx.activity.OnBackPressedCallback
 
 class MainActivity : FragmentActivity() {
     companion object {
@@ -55,6 +58,84 @@ class MainActivity : FragmentActivity() {
     }
 }
 
+class AuthStateManager private constructor() {
+    private var isSignedIn = false
+    private var currentUserId: String? = null
+    private val listeners = mutableListOf<(Boolean) -> Unit>()
+
+    fun addListener(listener: (Boolean) -> Unit) {
+        listeners.add(listener)
+        // Immediately notify new listener of current state
+        listener(isSignedIn && currentUserId != null)
+    }
+
+    fun removeListener(listener: (Boolean) -> Unit) {
+        listeners.remove(listener)
+    }
+
+    private fun notifyListeners() {
+        val isFullySignedIn = isSignedIn && currentUserId != null
+        listeners.forEach { it(isFullySignedIn) }
+    }
+
+    fun checkAuthState() {
+        Amplify.Auth.fetchAuthSession(
+            { session ->
+                val cognitoSession = session as AWSCognitoAuthSession
+                isSignedIn = cognitoSession.isSignedIn
+                if (isSignedIn) {
+                    Log.d(TAG, "User is signed in, fetching user attributes")
+                    Amplify.Auth.fetchUserAttributes(
+                        { attributes ->
+                            currentUserId = attributes.find { it.key == AuthUserAttributeKey.email() }?.value
+                            Log.d(TAG, "User attributes fetched, userId: $currentUserId")
+                            Handler(Looper.getMainLooper()).post {
+                                notifyListeners()
+                            }
+                        },
+                        { error -> 
+                            Log.e(TAG, "Failed to fetch user attributes", error)
+                            currentUserId = null
+                            Handler(Looper.getMainLooper()).post {
+                                notifyListeners()
+                            }
+                        }
+                    )
+                } else {
+                    Log.d(TAG, "User is not signed in")
+                    currentUserId = null
+                    Handler(Looper.getMainLooper()).post {
+                        notifyListeners()
+                    }
+                }
+            },
+            { error ->
+                Log.e(TAG, "Failed to fetch session", error)
+                isSignedIn = false
+                currentUserId = null
+                Handler(Looper.getMainLooper()).post {
+                    notifyListeners()
+                }
+            }
+        )
+    }
+
+    fun isUserSignedIn(): Boolean = isSignedIn && currentUserId != null
+
+    fun getCurrentUserId(): String? = currentUserId
+
+    companion object {
+        private const val TAG = "AuthStateManager"
+        private var instance: AuthStateManager? = null
+
+        fun getInstance(): AuthStateManager {
+            return instance ?: synchronized(this) {
+                instance ?: AuthStateManager().also { instance = it }
+            }
+        }
+    }
+}
+
 class MainFragment : BrowseSupportFragment() {
     companion object {
         private const val TAG = "MainFragment"
@@ -64,62 +145,68 @@ class MainFragment : BrowseSupportFragment() {
     private var rowsAdapter: ArrayObjectAdapter? = null
     private var listRowAdapter: ArrayObjectAdapter? = null
     private var authRowAdapter: ArrayObjectAdapter? = null
+    private var isReturningFromDetails = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d(TAG, "MainFragment onCreate")
     }
 
     override fun onViewCreated(view: android.view.View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        Log.d(TAG, "MainFragment onViewCreated")
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
-        Log.d(TAG, "MainFragment onActivityCreated")
         setupUIElements()
         setupContent()
-        checkAuthSession()
+        
+        // Register auth state listener
+        AuthStateManager.getInstance().addListener { isSignedIn ->
+            updateAuthUI(isSignedIn)
+        }
+        
+        // Initial auth check
+        AuthStateManager.getInstance().checkAuthState()
         
         // Set up card loading listener
         CardDataProvider.setOnCardsLoadedListener {
-            Log.d(TAG, "Cards loaded, updating UI")
             updateContent()
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        // Remove auth state listener
+        AuthStateManager.getInstance().removeListener { isSignedIn ->
+            updateAuthUI(isSignedIn)
+        }
+    }
+
     private fun setupUIElements() {
-        Log.d(TAG, "Setting up UI elements")
         title = "Amplify Fire TV"
         headersState = HEADERS_DISABLED
-        isHeadersTransitionOnBackEnabled = true
+        isHeadersTransitionOnBackEnabled = false  // Disable header transitions
         
         // Set the background color
         setBrandColor(requireContext().getColor(R.color.dark_orange))
-        
-        // Show the title
-        setHeadersTransitionOnBackEnabled(true)
         
         // Set up the search icon
         setSearchAffordanceColor(requireContext().getColor(R.color.dark_orange_light))
 
         // Enable the title by setting the headers state
         headersState = HEADERS_ENABLED
-        Log.d(TAG, "UI elements setup complete")
     }
 
     private fun setupContent() {
-        Log.d(TAG, "Setting up content structure")
         rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
         
-        // Set up auth row
+        // Set up auth row with custom presenter
         val authPresenter = AuthPresenter()
         authRowAdapter = ArrayObjectAdapter(authPresenter)
         rowsAdapter?.add(ListRow(null, authRowAdapter))
         
         // Set up content row
-        val cardPresenter = CardPresenter()
+        val cardPresenter = VideoCardPresenter()
         listRowAdapter = ArrayObjectAdapter(cardPresenter)
         val contentHeader = HeaderItem(0, "Featured Content")
         rowsAdapter?.add(ListRow(contentHeader, listRowAdapter))
@@ -131,11 +218,26 @@ class MainFragment : BrowseSupportFragment() {
         onItemViewClickedListener = OnItemViewClickedListener { itemViewHolder, item, rowViewHolder, row ->
             when (item) {
                 is CardData -> {
-                    Log.d(TAG, "Card clicked: ${item.title}")
-                    val intent = Intent(requireContext(), VideoPlayerActivity::class.java).apply {
-                        putExtra(VideoPlayerActivity.EXTRA_VIDEO_URL, item.videoUrl)
+                    if (!isReturningFromDetails) {
+                        // Show details fragment
+                        val fragment = VideoDetailsFragment().apply {
+                            arguments = Bundle().apply {
+                                putParcelable(VideoDetailsFragment.EXTRA_VIDEO_DATA, item)
+                            }
+                        }
+                        parentFragmentManager.beginTransaction()
+                            .setCustomAnimations(
+                                R.anim.lb_details_enter,
+                                R.anim.lb_details_exit,
+                                R.anim.lb_details_enter,
+                                R.anim.lb_details_exit
+                            )
+                            .replace(R.id.main_browse_fragment, fragment)
+                            .addToBackStack(null)
+                            .commit()
+                    } else {
+                        isReturningFromDetails = false
                     }
-                    startActivity(intent)
                 }
                 is AuthAction -> {
                     when (item) {
@@ -144,17 +246,14 @@ class MainFragment : BrowseSupportFragment() {
                             startActivityForResult(intent, SIGN_IN_REQUEST)
                         }
                         is AuthAction.SignOut -> {
-                            Log.d(TAG, "Sign out clicked")
                             Amplify.Auth.signOut { signOutResult ->
                                 when(signOutResult) {
                                     is CompleteSignOut -> {
-                                        Log.i(TAG, "Signed out successfully")
                                         Handler(Looper.getMainLooper()).post {
-                                            updateAuthUI(false)
+                                            AuthStateManager.getInstance().checkAuthState()
                                         }
                                     }
                                     is PartialSignOut -> {
-                                        Log.e(TAG, "Partial sign out occurred")
                                         signOutResult.hostedUIError?.let {
                                             Log.e(TAG, "HostedUI Error", it.exception)
                                         }
@@ -165,7 +264,7 @@ class MainFragment : BrowseSupportFragment() {
                                             Log.e(TAG, "RevokeToken Error", it.exception)
                                         }
                                         Handler(Looper.getMainLooper()).post {
-                                            updateAuthUI(false)
+                                            AuthStateManager.getInstance().checkAuthState()
                                         }
                                     }
                                     is FailedSignOut -> {
@@ -176,6 +275,13 @@ class MainFragment : BrowseSupportFragment() {
                         }
                     }
                 }
+            }
+        }
+
+        // Set up back stack listener
+        parentFragmentManager.addOnBackStackChangedListener {
+            if (parentFragmentManager.backStackEntryCount == 0) {
+                isReturningFromDetails = true
             }
         }
     }
@@ -192,33 +298,20 @@ class MainFragment : BrowseSupportFragment() {
         listRowAdapter?.notifyArrayItemRangeChanged(0, cards.size)
     }
 
-    private fun checkAuthSession() {
-        Amplify.Auth.fetchAuthSession(
-            { session ->
-                val cognitoSession = session as AWSCognitoAuthSession
-                if (cognitoSession.isSignedIn) {
-                    handleSignedInState()
-                } else {
-                    Log.d(TAG, "User is not signed in")
-                    Handler(Looper.getMainLooper()).post {
-                        updateAuthUI(false)
-                    }
-                }
-            },
-            { error ->
-                Log.e(TAG, "Failed to fetch session", error)
-                Handler(Looper.getMainLooper()).post {
-                    updateAuthUI(false)
-                }
-            }
-        )
+    private fun updateAuthUI(isSignedIn: Boolean) {
+        authRowAdapter?.clear()
+        if (isSignedIn) {
+            handleSignedInState()
+        } else {
+            authRowAdapter?.add(AuthAction.SignIn("Sign In"))
+            authRowAdapter?.notifyArrayItemRangeChanged(0, 1)
+        }
     }
 
     private fun handleSignedInState() {
         Amplify.Auth.fetchUserAttributes(
             { attributes ->
                 val email = attributes.find { it.key == AuthUserAttributeKey.email() }?.value
-                Log.d(TAG, "User is signed in with email: $email")
                 Handler(Looper.getMainLooper()).post {
                     authRowAdapter?.clear()
                     authRowAdapter?.add(AuthAction.SignOut(email ?: "", "Sign out"))
@@ -236,20 +329,10 @@ class MainFragment : BrowseSupportFragment() {
         )
     }
 
-    private fun updateAuthUI(isSignedIn: Boolean) {
-        authRowAdapter?.clear()
-        if (isSignedIn) {
-            handleSignedInState()
-        } else {
-            authRowAdapter?.add(AuthAction.SignIn("Sign In"))
-            authRowAdapter?.notifyArrayItemRangeChanged(0, 1)
-        }
-    }
-
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == SIGN_IN_REQUEST) {
-            checkAuthSession()
+            AuthStateManager.getInstance().checkAuthState()
         }
     }
 }
@@ -268,6 +351,10 @@ class AuthPresenter : Presenter() {
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
             setPadding(32, 16, 32, 16)
+            // Disable focus highlighting
+            isFocusable = false
+            isFocusableInTouchMode = false
+            background = null
         }
 
         val emailText = TextView(parent.context).apply {
@@ -282,6 +369,9 @@ class AuthPresenter : Presenter() {
             textSize = 18f
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
+            // Disable focus highlighting
+            isFocusable = false
+            isFocusableInTouchMode = false
         }
 
         val signOutText = TextView(parent.context).apply {
@@ -291,8 +381,9 @@ class AuthPresenter : Presenter() {
             )
             setTextColor(Color.WHITE)
             textSize = 18f
-            isFocusable = true
-            isFocusableInTouchMode = true
+            // Disable focus highlighting
+            isFocusable = false
+            isFocusableInTouchMode = false
         }
 
         layout.addView(emailText)
@@ -331,54 +422,7 @@ class CustomImageCardView(context: Context) : ImageCardView(context) {
     init {
         isFocusable = true
         isFocusableInTouchMode = true
-        setMainImageDimensions(313, 176)
         setInfoAreaBackgroundColor(context.getColor(R.color.dark_orange))
-        setMainImageScaleType(ImageView.ScaleType.CENTER_CROP)
         setCardType(CARD_TYPE_INFO_UNDER)
-    }
-}
-
-class CardPresenter : Presenter() {
-    companion object {
-        private const val TAG = "CardPresenter"
-    }
-
-    override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
-        val cardView = CustomImageCardView(parent.context)
-        cardView.isFocusable = true
-        cardView.isFocusableInTouchMode = true
-        return ViewHolder(cardView)
-    }
-
-    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any) {
-        val cardData = item as CardData
-        val cardView = viewHolder.view as CustomImageCardView
-        
-        cardView.titleText = cardData.title
-        cardView.contentText = cardData.subtitle
-        
-        // Load image with Glide
-        loadImage(cardView, cardData)
-        
-        cardView.mainImageView.visibility = View.VISIBLE
-        cardView.setInfoVisibility(BaseCardView.CARD_REGION_VISIBLE_ALWAYS)
-    }
-
-    override fun onUnbindViewHolder(viewHolder: ViewHolder) {
-        val cardView = viewHolder.view as CustomImageCardView
-        cardView.mainImageView.setImageDrawable(null)
-        cardView.titleText = ""
-        cardView.contentText = ""
-    }
-
-    private fun loadImage(cardView: ImageCardView, cardData: CardData) {
-        // Clear any existing image
-        cardView.mainImageView.setImageDrawable(null)
-        
-        // Load new image with Glide
-        Glide.with(cardView.context)
-            .load(cardData.imageUrl)
-            .transition(DrawableTransitionOptions.withCrossFade())
-            .into(cardView.mainImageView)
     }
 }
